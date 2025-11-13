@@ -1,3 +1,5 @@
+THIS IS A DRAFT REPO FOR THE BLUEBERRY COMPILER, DO NOT USE.
+
 # blueberry-compiler
 A prototype IDL compiler and code generator for the new Blueberry protocol
 
