@@ -120,7 +120,7 @@ fn parses_typedefs_sequences_and_scoped_names() {
 
     let mut iter = defs.iter();
 
-    fn expect_typedef<'a>(def: &'a Definition) -> &'a TypeDef {
+    fn expect_typedef(def: &Definition) -> &TypeDef {
         match def {
             Definition::TypeDef(t) => &t.node,
             other => panic!("expected typedef, found {:?}", other),
@@ -174,9 +174,10 @@ fn parses_constant_values() {
     assert!(matches!(max_clients.value, ConstValue::Integer(42)));
 
     let pi_const = consts.next().expect("PI const missing");
-    assert!(
-        matches!(pi_const.value, ConstValue::Float(value) if (value - 3.1415).abs() < f64::EPSILON)
-    );
+    assert!(matches!(
+        pi_const.value,
+        ConstValue::Float(value) if (value - std::f64::consts::PI).abs() < f64::EPSILON
+    ));
 
     let feature_flag = consts.next().expect("FEATURE_FLAG const missing");
     assert!(matches!(feature_flag.value, ConstValue::Boolean(true)));
