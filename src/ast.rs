@@ -126,10 +126,59 @@ pub enum ImportScope {
 pub enum ConstValue {
     Integer(IntegerLiteral),
     Float(f64),
+    Fixed(FixedPointLiteral),
     String(String),
     Boolean(bool),
     Char(char),
     ScopedName(Vec<String>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FixedPointLiteral {
+    /// Combined integer and fractional digits without a decimal point.
+    pub digits: String,
+    /// Number of digits that originally appeared after the decimal point.
+    pub scale: u32,
+    /// Whether the literal was prefixed with a minus sign.
+    pub negative: bool,
+}
+
+impl FixedPointLiteral {
+    pub fn from_literal_str(raw: &str) -> Self {
+        let (negative, rest) = split_sign(raw);
+        let magnitude = rest
+            .strip_suffix('d')
+            .or_else(|| rest.strip_suffix('D'))
+            .expect("fixed-point literal must end with d or D");
+
+        let mut digits = String::new();
+        let mut scale = 0_u32;
+
+        if let Some(dot_idx) = magnitude.find('.') {
+            let integer = &magnitude[..dot_idx];
+            let fraction = &magnitude[dot_idx + 1..];
+            digits.push_str(integer);
+            digits.push_str(fraction);
+            scale = fraction.len() as u32;
+        } else {
+            digits.push_str(magnitude);
+        }
+
+        assert!(
+            !digits.is_empty(),
+            "fixed-point literal must include at least one digit"
+        );
+
+        FixedPointLiteral {
+            digits,
+            scale,
+            negative,
+        }
+    }
+
+    pub fn precision(&self) -> usize {
+        self.digits.len()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

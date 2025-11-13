@@ -1,6 +1,6 @@
 use rust_lalrpop_experiment::{
-    AnnotationParam, ConstValue, Definition, ImportScope, IntegerBase, IntegerLiteral, Type,
-    TypeDef, parse_idl,
+    AnnotationParam, ConstValue, Definition, FixedPointLiteral, ImportScope, IntegerBase,
+    IntegerLiteral, Type, TypeDef, parse_idl,
 };
 use std::{fs, path::Path};
 
@@ -43,6 +43,13 @@ fn expect_integer(value: &ConstValue, expected: i64) -> &IntegerLiteral {
             literal
         }
         other => panic!("expected integer const {}, found {:?}", expected, other),
+    }
+}
+
+fn expect_fixed(value: &ConstValue) -> &FixedPointLiteral {
+    match value {
+        ConstValue::Fixed(literal) => literal,
+        other => panic!("expected fixed-point const, found {:?}", other),
     }
 }
 
@@ -397,6 +404,38 @@ fn parses_floating_point_literals() {
         expect_float(expect_const_value(&defs, "NEGATIVE_FRACTION")),
         -0.125,
     );
+}
+
+#[test]
+fn parses_fixed_point_literals() {
+    let defs = parse_fixture("fixed_literals.idl");
+    assert_eq!(defs.len(), 5);
+
+    let fractional = expect_fixed(expect_const_value(&defs, "FRACTIONAL"));
+    assert_eq!(fractional.digits, "1234");
+    assert_eq!(fractional.scale, 2);
+    assert_eq!(fractional.precision(), 4);
+    assert!(!fractional.negative);
+
+    let fraction_only = expect_fixed(expect_const_value(&defs, "FRACTION_ONLY"));
+    assert_eq!(fraction_only.digits, "625");
+    assert_eq!(fraction_only.scale, 3);
+    assert_eq!(fraction_only.precision(), 3);
+    assert!(!fraction_only.negative);
+
+    let integer_only = expect_fixed(expect_const_value(&defs, "INTEGER_ONLY"));
+    assert_eq!(integer_only.digits, "42");
+    assert_eq!(integer_only.scale, 0);
+    assert_eq!(integer_only.precision(), 2);
+
+    let trailing_dot = expect_fixed(expect_const_value(&defs, "TRAILING_DOT"));
+    assert_eq!(trailing_dot.digits, "7");
+    assert_eq!(trailing_dot.scale, 0);
+
+    let negative_fraction = expect_fixed(expect_const_value(&defs, "NEGATIVE_FRACTION"));
+    assert_eq!(negative_fraction.digits, "0875");
+    assert_eq!(negative_fraction.scale, 3);
+    assert!(negative_fraction.negative);
 }
 
 #[test]
