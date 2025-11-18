@@ -262,14 +262,12 @@ pub struct Annotation {
 
 /// Parameters to an applied annotation.
 ///
-/// For now, only the "named" form is supported:
-///   @MyAnn(foo = 1, bar = TRUE)
-/// and the empty form:
-///   @MyAnn
+/// Supports both named parameters (`@MyAnn(foo = 1)`) and positional ones
+/// (`@MyAnn("param")`). An empty parameter list yields the bare form `@MyAnn`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnnotationParam {
     Named { name: String, value: ConstValue },
-    // Positional(ConstValue),  // Can be added later if you want the shortened form
+    Positional(ConstValue),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

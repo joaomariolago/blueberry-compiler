@@ -530,7 +530,7 @@ fn folds_numeric_constant_references() {
         .first()
         .and_then(|ann| ann.params.first())
         .map(|param| match param {
-            AnnotationParam::Named { value, .. } => value,
+            AnnotationParam::Named { value, .. } | AnnotationParam::Positional(value) => value,
         })
         .expect("ANNOTATED_LIMIT annotation missing");
     expect_integer(const_annotation_value, 12);
@@ -547,7 +547,7 @@ fn folds_numeric_constant_references() {
         .first()
         .and_then(|ann| ann.params.first())
         .map(|param| match param {
-            AnnotationParam::Named { value, .. } => value,
+            AnnotationParam::Named { value, .. } | AnnotationParam::Positional(value) => value,
         })
         .expect("struct annotation missing");
     expect_integer(struct_annotation_value, 12);
@@ -562,7 +562,7 @@ fn folds_numeric_constant_references() {
         .first()
         .and_then(|ann| ann.params.first())
         .map(|param| match param {
-            AnnotationParam::Named { value, .. } => value,
+            AnnotationParam::Named { value, .. } | AnnotationParam::Positional(value) => value,
         })
         .expect("member annotation missing");
     expect_integer(member_annotation_value, 12);
@@ -613,9 +613,13 @@ fn attaches_annotations_and_comments() {
         struct_def.comments,
         vec!["Tests annotation parsing and comment capture."]
     );
-    assert_eq!(struct_def.annotations.len(), 1);
+    assert_eq!(struct_def.annotations.len(), 2);
 
-    let applied = &struct_def.annotations[0];
+    let marker = &struct_def.annotations[0];
+    assert_eq!(marker.name, vec!["Blueprint", "Marker"]);
+    assert!(marker.params.is_empty());
+
+    let applied = &struct_def.annotations[1];
     assert_eq!(applied.name, vec!["Blueprint", "Experimental"]);
     assert_eq!(applied.params.len(), 1);
     match &applied.params[0] {
@@ -623,10 +627,13 @@ fn attaches_annotations_and_comments() {
             assert_eq!(name, "role");
             expect_integer(value, 1);
         }
+        AnnotationParam::Positional(_) => {
+            panic!("expected named struct annotation parameter");
+        }
     }
 
     let members = &struct_def.node.members;
-    assert_eq!(members.len(), 2);
+    assert_eq!(members.len(), 3);
 
     assert_eq!(members[0].comments, vec!["Primary identifier"]);
     assert_eq!(members[0].annotations.len(), 1);
@@ -640,12 +647,52 @@ fn attaches_annotations_and_comments() {
                 other => panic!("expected scoped annotation value, found {:?}", other),
             }
         }
+        AnnotationParam::Positional(_) => {
+            panic!("expected named annotation parameter for encoded member");
+        }
     }
 
+    assert_eq!(members[1].comments, vec!["Display label"]);
     assert_eq!(members[1].annotations.len(), 1);
-    let flag_ann = &members[1].annotations[0];
+    let label_ann = &members[1].annotations[0];
+    assert_eq!(label_ann.name, vec!["Wire", "Label"]);
+    match &label_ann.params[0] {
+        AnnotationParam::Positional(value) => match value {
+            ConstValue::String(text) => assert_eq!(text, "primary"),
+            other => panic!("expected string literal, found {:?}", other),
+        },
+        AnnotationParam::Named { .. } => {
+            panic!("expected positional annotation parameter for label");
+        }
+    }
+
+    assert_eq!(members[2].comments, vec!["Toggle flag"]);
+    assert_eq!(members[2].annotations.len(), 2);
+
+    let flag_ann = &members[2].annotations[0];
     assert_eq!(flag_ann.name, vec!["Wire", "Flag"]);
     assert!(flag_ann.params.is_empty());
+
+    let flag_options = &members[2].annotations[1];
+    assert_eq!(flag_options.name, vec!["Wire", "FlagOptions"]);
+    assert_eq!(flag_options.params.len(), 2);
+    match &flag_options.params[0] {
+        AnnotationParam::Named { name, value } => {
+            assert_eq!(name, "mode");
+            match value {
+                ConstValue::String(text) => assert_eq!(text, "test"),
+                other => panic!("expected string literal, found {:?}", other),
+            }
+        }
+        AnnotationParam::Positional(_) => panic!("expected named parameter for mode"),
+    }
+    match &flag_options.params[1] {
+        AnnotationParam::Named { name, value } => {
+            assert_eq!(name, "retries");
+            expect_integer(value, 10);
+        }
+        AnnotationParam::Positional(_) => panic!("expected named parameter for retries"),
+    }
 }
 
 #[test]

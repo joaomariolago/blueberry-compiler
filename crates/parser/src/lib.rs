@@ -273,6 +273,7 @@ impl NumericConstantFolder {
             for param in &mut annotation.params {
                 match param {
                     AnnotationParam::Named { value, .. } => self.fold_const_value(value, scope),
+                    AnnotationParam::Positional(value) => self.fold_const_value(value, scope),
                 }
             }
         }
