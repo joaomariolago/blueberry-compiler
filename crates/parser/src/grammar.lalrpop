@@ -39,6 +39,7 @@ AnnotationParam: AnnotationParam = {
         name: id,
         value,
     },
+    <value:ConstValue> => AnnotationParam::Positional(value),
 };
 
 AnnotationParamList: Vec<AnnotationParam> = {
@@ -51,17 +52,33 @@ AnnotationParamList: Vec<AnnotationParam> = {
 };
 
 Annotation: Annotation = {
-    // With parameters: @MyAnn(foo = 1, bar = "x")
-    "@" <name:ScopedName> "(" <params:AnnotationParamList> ")" => Annotation {
+    // With parameters: @MyAnn(foo = 1, bar = "x") or @MyAnn("value")
+    <name:AnnotationName> "(" <params:AnnotationParamList> ")" => Annotation {
         name,
         params,
     },
 
-    // No-parameter form must be written as @MyAnn()
-    "@" <name:ScopedName> "(" ")" => Annotation {
+    // Empty parameter form supports @MyAnn() and @MyAnn
+    <name:AnnotationName> "(" ")" => Annotation {
         name,
         params: Vec::new(),
     },
+    <name:AnnotationName> => Annotation {
+        name,
+        params: Vec::new(),
+    },
+};
+
+AnnotationName: Vec<String> = {
+    r"@(::)?[a-zA-Z_][a-zA-Z0-9_]*(::[a-zA-Z_][a-zA-Z0-9_]*)*" => {
+        let raw = <>.to_string();
+        let trimmed = raw.trim_start_matches('@');
+        trimmed
+            .split("::")
+            .filter(|segment| !segment.is_empty())
+            .map(|segment| segment.to_string())
+            .collect()
+    }
 };
 
 AnnotationList: Vec<Annotation> = {

@@ -178,11 +178,13 @@ impl IdlGenerator {
             self.write_indent(indent);
             self.buffer.push('@');
             self.buffer.push_str(&format_scoped_name(&annotation.name));
-            self.buffer.push('(');
-            if !annotation.params.is_empty() {
-                let params = render_annotation_params(annotation);
-                self.buffer.push_str(&params);
+            if annotation.params.is_empty() {
+                self.buffer.push('\n');
+                continue;
             }
+            let params = render_annotation_params(annotation);
+            self.buffer.push('(');
+            self.buffer.push_str(&params);
             self.buffer.push_str(")\n");
         }
     }
@@ -367,11 +369,18 @@ fn render_import_scope_tokens(scope: &ImportScope) -> TokenStream {
 fn render_annotation_params(annotation: &Annotation) -> String {
     let mut rendered = Vec::new();
     for param in &annotation.params {
-        let AnnotationParam::Named { name, value } = param;
-        let ident = ident(name);
-        let fragment = render_const_value_fragment(value);
-        let assignment = format_assignment(quote!(#ident =), &fragment);
-        rendered.push(assignment.trim().to_string());
+        match param {
+            AnnotationParam::Named { name, value } => {
+                let ident = ident(name);
+                let fragment = render_const_value_fragment(value);
+                let assignment = format_assignment(quote!(#ident =), &fragment);
+                rendered.push(assignment.trim().to_string());
+            }
+            AnnotationParam::Positional(value) => {
+                let fragment = render_const_value_fragment(value);
+                rendered.push(fragment.to_string());
+            }
+        }
     }
     rendered.join(", ")
 }
