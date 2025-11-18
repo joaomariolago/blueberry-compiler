@@ -10,6 +10,11 @@ lalrpop_mod!(grammar);
 pub use ast::*;
 pub use grammar::*;
 
+const TOPIC_ANNOTATION_NAME: &str = "topic";
+
+type MessageValidationFn =
+    fn(scope: &[String], message_def: &Commented<MessageDef>) -> Result<(), String>;
+
 /// Parse an IDL file string into a vector of definitions
 pub fn parse_idl(input: &str) -> Result<Vec<Definition>, String> {
     let mut defs = grammar::IdlFileParser::new()
@@ -19,6 +24,7 @@ pub fn parse_idl(input: &str) -> Result<Vec<Definition>, String> {
     // Pos processing AST (Abstract Syntax Tree)
     fold_numeric_constants(&mut defs);
     propagate_enum_values(&mut defs);
+    validate_message_annotations(&defs)?;
 
     Ok(defs)
 }
@@ -43,6 +49,71 @@ fn propagate_enum_values(defs: &mut [Definition]) {
             }
             _ => {}
         }
+    }
+}
+
+fn validate_message_annotations(defs: &[Definition]) -> Result<(), String> {
+    let validators: &[MessageValidationFn] = &[ensure_topic_annotation];
+    let mut scope = Vec::new();
+    validate_messages_in_scope(defs, &mut scope, validators)
+}
+
+fn validate_messages_in_scope(
+    defs: &[Definition],
+    scope: &mut Vec<String>,
+    validators: &[MessageValidationFn],
+) -> Result<(), String> {
+    for def in defs {
+        match def {
+            Definition::ModuleDef(module_def) => {
+                scope.push(module_def.node.name.clone());
+                validate_messages_in_scope(&module_def.node.definitions, scope, validators)?;
+                scope.pop();
+            }
+            Definition::MessageDef(message_def) => {
+                for validator in validators {
+                    validator(scope, message_def)?;
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn ensure_topic_annotation(
+    scope: &[String],
+    message_def: &Commented<MessageDef>,
+) -> Result<(), String> {
+    if has_annotation(&message_def.annotations, TOPIC_ANNOTATION_NAME) {
+        return Ok(());
+    }
+
+    let full_name = scoped_message_name(scope, &message_def.node.name);
+    Err(format!(
+        "message {full_name} must declare a @topic annotation"
+    ))
+}
+
+fn has_annotation(annotations: &[Annotation], expected_name: &str) -> bool {
+    annotations.iter().any(|annotation| {
+        annotation
+            .name
+            .last()
+            .map(|segment| segment.eq_ignore_ascii_case(expected_name))
+            .unwrap_or(false)
+    })
+}
+
+fn scoped_message_name(scope: &[String], message_name: &str) -> String {
+    if message_name.is_empty() {
+        return "<unnamed message>".to_string();
+    }
+
+    if scope.is_empty() {
+        message_name.to_string()
+    } else {
+        format!("{}::{}", scope.join("::"), message_name)
     }
 }
 
