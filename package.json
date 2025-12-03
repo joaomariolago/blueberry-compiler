@@ -1,0 +1,15 @@
+{
+  "name": "blueberry-wasm",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "blueberry_wasm_bg.wasm",
+    "blueberry_wasm.js",
+    "blueberry_wasm.d.ts"
+  ],
+  "main": "blueberry_wasm.js",
+  "types": "blueberry_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blueberry IDL Playground</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/darcula.css" />
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+        }
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0d1117;
+            color: #f0f6fc;
+            display: flex;
+            flex-direction: column;
+        }
+        header.site-header {
+            padding: 0.75rem 1.5rem;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+        }
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1px;
+            background: #30363d;
+            min-height: 0;
+        }
+        section.pane {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        section.pane header {
+            padding: 0.75rem 1rem;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            font-weight: 600;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .pane-heading {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            min-width: 0;
+            flex: 1;
+        }
+        section.pane header span {
+            display: block;
+            font-size: 0.85rem;
+            opacity: 0.7;
+            font-weight: 400;
+        }
+        .output-picker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        .output-picker select {
+            background: #161b22;
+            color: #f0f6fc;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+            min-width: 160px;
+        }
+        .pane-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0d1117;
+            min-height: 0;
+        }
+        .pane-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #30363d;
+            background: #0d1117;
+            flex-wrap: wrap;
+        }
+        .pane-controls label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+        .pane-controls select {
+            background: #161b22;
+            color: #f0f6fc;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+            min-width: 180px;
+        }
+        .pane-controls select:disabled {
+            opacity: 0.6;
+        }
+        .pane-controls .inline-actions {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .pane-controls button {
+            background: #238636;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .pane-controls button:hover:not(:disabled) {
+            background: #2ea043;
+        }
+        .pane-controls button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .copy-status {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+        .file-tabs {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid #30363d;
+            background: #0f1622;
+            overflow-x: auto;
+        }
+        .file-tab {
+            border: 1px solid #30363d;
+            background: #161b22;
+            color: #f0f6fc;
+            padding: 0.3rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        .file-tab:hover {
+            background: #1f2933;
+        }
+        .file-tab.active {
+            background: #238636;
+            border-color: #2ea043;
+            color: #fff;
+        }
+        .download-status {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+        .output-info {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #30363d;
+            font-size: 0.85rem;
+            opacity: 0.8;
+            min-height: 2.25rem;
+            display: flex;
+            align-items: center;
+        }
+        .fixture-message {
+            font-size: 0.8rem;
+            opacity: 0.75;
+        }
+        .CodeMirror {
+            flex: 1;
+            height: 100%;
+            font-family: "JetBrains Mono", "Fira Code", monospace;
+            font-size: 0.95rem;
+            background: #0d1117;
+            color: #f0f6fc;
+        }
+        .CodeMirror.error {
+            box-shadow: 0 0 0 1px #ff7b72 inset;
+        }
+        .CodeMirror .cm-parse-error {
+            background: rgba(255, 123, 114, 0.25);
+            border-bottom: 1px solid #ff7b72;
+        }
+        .CodeMirror .cm-line-parse-error {
+            background: rgba(255, 123, 114, 0.1);
+        }
+        .CodeMirror-scroll {
+            min-height: 100%;
+        }
+        .output-pane {
+            flex: 1;
+            margin: 0;
+            background: #0d1117;
+            color: #f0f6fc;
+            padding: 1rem;
+            font-family: "JetBrains Mono", "Fira Code", monospace;
+            font-size: 0.9rem;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+        .output-pane.error {
+            color: #ff7b72;
+        }
+        @media (max-width: 900px) {
+            main {
+                flex-direction: column;
+                display: flex;
+            }
+            .CodeMirror,
+            .output-pane {
+                min-height: 40vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <h1>Blueberry IDL Playground</h1>
+    </header>
+    <main>
+        <section class="pane">
+            <header>
+                <div class="pane-heading">
+                    <div>Input IDL</div>
+                    <span>CodeMirror highlighting & live parsing</span>
+                </div>
+            </header>
+            <div class="pane-body">
+                <div class="pane-controls">
+                    <label for="fixture-select">Load fixture:</label>
+                    <select id="fixture-select" disabled>
+                        <option value="">Loading fixtures...</option>
+                    </select>
+                    <span id="fixture-message" class="fixture-message"></span>
+                </div>
+                <textarea id="idl-input" spellcheck="false"></textarea>
+            </div>
+        </section>
+        <section class="pane">
+            <header>
+                <div class="pane-heading">
+                    <div>Parser Output</div>
+                    <span>Formatted AST or error message</span>
+                </div>
+            </header>
+            <pre id="parser-output" class="output-pane">Loading parser...</pre>
+        </section>
+        <section class="pane">
+            <header>
+                <div class="pane-heading">
+                    <div>Generated Output</div>
+                    <span>Round-tripped IDL or language-specific code</span>
+                </div>
+                <div class="output-picker">
+                    <label for="output-tab-select">Generator:</label>
+                    <select id="output-tab-select">
+                        <option value="idl">IDL</option>
+                        <option value="rust">Rust</option>
+                        <option value="python">Python</option>
+                        <option value="c">C</option>
+                        <option value="cpp">C++</option>
+                    </select>
+                </div>
+            </header>
+            <div class="pane-body">
+                <div class="pane-controls">
+                    <div class="output-info" id="output-info">Round-tripped IDL</div>
+                    <div class="inline-actions">
+                        <button type="button" id="download-zip-btn">Download ZIP</button>
+                        <button type="button" id="copy-generated-btn">Copy output</button>
+                        <span id="copy-status" class="copy-status" aria-live="polite"></span>
+                        <span id="download-status" class="download-status" aria-live="polite"></span>
+                    </div>
+                </div>
+                <div class="file-tabs" id="file-tabs"></div>
+                <textarea id="generated-output" spellcheck="false"></textarea>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/clike/clike.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/mode/simple.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/rust/rust.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script type="module">
+        import init, { analyze_idl_wasm } from "./blueberry_wasm.js";
+
+        const textarea = document.getElementById("idl-input");
+        const parserOutputEl = document.getElementById("parser-output");
+        const generatedTextarea = document.getElementById("generated-output");
+        const fixtureSelect = document.getElementById("fixture-select");
+        const outputTabSelect = document.getElementById("output-tab-select");
+        const fixtureMessageEl = document.getElementById("fixture-message");
+        const copyButton = document.getElementById("copy-generated-btn");
+        const downloadButton = document.getElementById("download-zip-btn");
+        const copyStatusEl = document.getElementById("copy-status");
+        const downloadStatusEl = document.getElementById("download-status");
+        const outputInfoEl = document.getElementById("output-info");
+        const fileTabsContainer = document.getElementById("file-tabs");
+        const OUTPUT_TABS = {
+            idl: { label: "IDL", mode: "text/x-csrc", commentPrefix: "//" },
+            rust: { label: "Rust", mode: "text/x-rustsrc", commentPrefix: "//" },
+            python: { label: "Python", mode: "python", commentPrefix: "#" },
+            c: { label: "C", mode: "text/x-csrc", commentPrefix: "//" },
+            cpp: { label: "C++", mode: "text/x-c++src", commentPrefix: "//" },
+        };
+        const LANGUAGE_TABS = ["rust", "python", "c", "cpp"];
+        const outputState = {};
+        Object.keys(OUTPUT_TABS).forEach((key) => {
+            outputState[key] = { files: [], hasError: false, info: "", activePath: null, message: "" };
+        });
+        let currentOutputTab = "idl";
+        let generatedEditor;
+        let inputEditor;
+        let currentErrorMarker = null;
+        let currentErrorLine = null;
+        let isProgrammaticEditorChange = false;
+        let copyStatusTimer = null;
+
+        function clearEditorErrorHighlight() {
+            if (currentErrorMarker) {
+                currentErrorMarker.clear();
+                currentErrorMarker = null;
+            }
+            if (currentErrorLine && inputEditor) {
+                inputEditor.removeLineClass(currentErrorLine, "background", "cm-line-parse-error");
+                currentErrorLine = null;
+            }
+        }
+
+        function updateOutputState(tabId, state) {
+            if (!outputState[tabId]) {
+                outputState[tabId] = { files: [], hasError: false, info: "", activePath: null, message: "" };
+            }
+            const target = outputState[tabId];
+            if (Array.isArray(state.files)) {
+                target.files = state.files;
+            }
+            if (typeof state.message === "string") {
+                target.message = state.message;
+            }
+            if (typeof state.hasError === "boolean") {
+                target.hasError = state.hasError;
+            } else if (state.hasError !== undefined) {
+                target.hasError = Boolean(state.hasError);
+            }
+            if (typeof state.info === "string") {
+                target.info = state.info;
+            }
+            const providedPath = typeof state.activePath === "string" ? state.activePath : null;
+            if (target.files.length === 0) {
+                target.activePath = null;
+            } else if (
+                providedPath &&
+                target.files.some((file) => file.path === providedPath)
+            ) {
+                target.activePath = providedPath;
+            } else if (!target.activePath || !target.files.some((file) => file.path === target.activePath)) {
+                target.activePath = target.files[0].path;
+            }
+        }
+
+        function normalizeFiles(rawFiles) {
+            if (!Array.isArray(rawFiles)) {
+                return [];
+            }
+            return rawFiles
+                .map((file) => {
+                    if (!file || typeof file !== "object") {
+                        return null;
+                    }
+                    const path = typeof file.path === "string" ? file.path : "";
+                    const contents = typeof file.contents === "string" ? file.contents : "";
+                    if (!path && !contents) {
+                        return null;
+                    }
+                    return { path, contents };
+                })
+                .filter(Boolean);
+        }
+
+        function describeFilesInfo(files) {
+            if (!files.length) {
+                return "No files generated";
+            }
+            if (files.length === 1) {
+                return files[0].path ? `File: ${files[0].path}` : "Single file generated";
+            }
+            return `${files.length} files generated`;
+        }
+
+        function getActiveFile(tabId) {
+            const state = outputState[tabId];
+            if (!state || !Array.isArray(state.files) || state.files.length === 0) {
+                return null;
+            }
+            const byPath = state.files.find((file) => file.path === state.activePath);
+            return byPath || state.files[0];
+        }
+
+        function fillOutputStatesForFailure(message) {
+            const details =
+                typeof message === "string" && message.length > 0 ? message : "Unknown error";
+            updateOutputState("idl", {
+                files: [],
+                message: `Cannot generate IDL:\n${details}`,
+                hasError: true,
+                info: "IDL generation failed",
+            });
+            LANGUAGE_TABS.forEach((lang) => {
+                const label = OUTPUT_TABS[lang]?.label ?? lang.toUpperCase();
+                updateOutputState(lang, {
+                    files: [],
+                    message: `Cannot generate ${label} code:\n${details}`,
+                    hasError: true,
+                    info: `${label} generation failed`,
+                });
+            });
+        }
+
+        function applyCodegenResults(rawCodegen) {
+            const codegen =
+                rawCodegen && typeof rawCodegen === "object" ? rawCodegen : Object.create(null);
+            LANGUAGE_TABS.forEach((lang) => {
+                const config = OUTPUT_TABS[lang];
+                const langResult =
+                    codegen && typeof codegen[lang] === "object" ? codegen[lang] : null;
+                const langError =
+                    langResult && typeof langResult.error === "string" ? langResult.error : null;
+                const files = normalizeFiles(langResult && langResult.files);
+                if (langError) {
+                    updateOutputState(lang, {
+                        files: [],
+                        message: `Code generation error:\n${langError}`,
+                        hasError: true,
+                        info: langError,
+                    });
+                    return;
+                }
+                if (files.length === 0) {
+                    updateOutputState(lang, {
+                        files: [],
+                        message: `No ${config.label} files were generated.`,
+                        hasError: false,
+                        info: "No files generated",
+                    });
+                    return;
+                }
+                updateOutputState(lang, {
+                    files,
+                    activePath: files[0]?.path ?? null,
+                    message: "",
+                    hasError: false,
+                    info: describeFilesInfo(files),
+                });
+            });
+        }
+
+        function updateOutputSelectState() {
+            if (outputTabSelect) {
+                outputTabSelect.value = currentOutputTab;
+            }
+        }
+
+        function renderFileTabs() {
+            if (!fileTabsContainer) {
+                return;
+            }
+            const state = outputState[currentOutputTab] ?? {
+                files: [],
+                activePath: null,
+                message: "",
+            };
+            fileTabsContainer.innerHTML = "";
+            if (!state.files || state.files.length === 0) {
+                const placeholder = document.createElement("span");
+                placeholder.textContent = state.message
+                    ? "No files generated"
+                    : "Awaiting generator output";
+                placeholder.style.opacity = "0.7";
+                fileTabsContainer.appendChild(placeholder);
+                return;
+            }
+            state.files.forEach((file, index) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = `file-tab${file.path === state.activePath ? " active" : ""}`;
+                button.textContent = file.path || `File ${index + 1}`;
+                button.addEventListener("click", () => {
+                    updateOutputState(currentOutputTab, { activePath: file.path });
+                    applyOutputToEditor();
+                });
+                fileTabsContainer.appendChild(button);
+            });
+        }
+
+        function applyOutputToEditor() {
+            updateOutputSelectState();
+            const config = OUTPUT_TABS[currentOutputTab] ?? OUTPUT_TABS.idl;
+            const state =
+                outputState[currentOutputTab] ??
+                { files: [], hasError: false, info: "", message: "", activePath: null };
+            const activeFile = getActiveFile(currentOutputTab);
+            const content = (activeFile && activeFile.contents) || state.message || "";
+            if (generatedEditor) {
+                generatedEditor.setOption("mode", config.mode ?? "text/x-csrc");
+                generatedEditor.setValue(content);
+                generatedEditor.refresh();
+                const wrapper = generatedEditor.getWrapperElement();
+                if (wrapper) {
+                    wrapper.classList.toggle("error", Boolean(state.hasError));
+                }
+            } else if (generatedTextarea) {
+                generatedTextarea.value = content;
+                generatedTextarea.classList.toggle("error", Boolean(state.hasError));
+            }
+            if (outputInfoEl) {
+                outputInfoEl.textContent = state.info ?? "";
+            }
+            if (downloadButton) {
+                downloadButton.disabled = !state.files || state.files.length === 0;
+            }
+            renderFileTabs();
+        }
+
+        function setOutputTab(tabId) {
+            if (!OUTPUT_TABS[tabId]) {
+                return;
+            }
+            currentOutputTab = tabId;
+            applyOutputToEditor();
+        }
+
+        if (outputTabSelect) {
+            outputTabSelect.addEventListener("change", (event) => {
+                const tabId = event.target.value;
+                setOutputTab(tabId);
+            });
+        }
+
+        function extractErrorOffsets(errorMessage) {
+            if (typeof errorMessage !== "string") {
+                return null;
+            }
+            const tokenMatch = errorMessage.match(/token:\s*\((\d+),\s*Token\([^)]+\),\s*(\d+)\)/);
+            if (tokenMatch) {
+                return {
+                    start: Number(tokenMatch[1]),
+                    end: Number(tokenMatch[2]),
+                };
+            }
+            const locationMatch = errorMessage.match(/location:\s*(?:Some\()?(\d+)/);
+            if (locationMatch) {
+                const start = Number(locationMatch[1]);
+                return {
+                    start,
+                    end: start + 1,
+                };
+            }
+            return null;
+        }
+
+        function highlightParseError(errorMessage) {
+            if (!inputEditor) {
+                return;
+            }
+            clearEditorErrorHighlight();
+            const offsets = extractErrorOffsets(errorMessage);
+            if (!offsets) {
+                return;
+            }
+            const doc = inputEditor.getDoc();
+            const textLength = doc.getValue().length;
+            const startIndex = Math.max(0, Math.min(offsets.start, textLength));
+            const endIndexRaw = Number.isFinite(offsets.end) ? offsets.end : offsets.start + 1;
+            const endIndexCandidate = Math.max(startIndex, Math.min(endIndexRaw, textLength));
+            const endIndex = startIndex === endIndexCandidate ? Math.min(startIndex + 1, textLength) : endIndexCandidate;
+            const from = doc.posFromIndex(startIndex);
+            const to = doc.posFromIndex(endIndex);
+            currentErrorMarker = doc.markText(from, to, { className: "cm-parse-error" });
+            currentErrorLine = inputEditor.addLineClass(from.line, "background", "cm-line-parse-error");
+            inputEditor.scrollIntoView({ from, to }, 100);
+        }
+
+        function updateFixtureMessage(message) {
+            if (fixtureMessageEl) {
+                fixtureMessageEl.textContent = message ?? "";
+            }
+        }
+
+        function setCopyStatus(message, isError = false) {
+            if (!copyStatusEl) {
+                return;
+            }
+            copyStatusEl.textContent = message ?? "";
+            copyStatusEl.style.color = isError ? "#ff7b72" : "#f0f6fc";
+            if (copyStatusTimer) {
+                clearTimeout(copyStatusTimer);
+                copyStatusTimer = null;
+            }
+            if (message) {
+                copyStatusTimer = setTimeout(() => {
+                    copyStatusEl.textContent = "";
+                    copyStatusTimer = null;
+                }, 2000);
+            }
+        }
+
+        function setDownloadStatus(message, isError = false) {
+            if (!downloadStatusEl) {
+                return;
+            }
+            downloadStatusEl.textContent = message ?? "";
+            downloadStatusEl.style.color = isError ? "#ff7b72" : "#f0f6fc";
+            if (message) {
+                setTimeout(() => {
+                    if (downloadStatusEl.textContent === message) {
+                        downloadStatusEl.textContent = "";
+                    }
+                }, 2500);
+            }
+        }
+
+        function setFixtureSelectPlaceholder(text, shouldDisable = true) {
+            if (!fixtureSelect) {
+                return;
+            }
+            fixtureSelect.innerHTML = "";
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = text;
+            fixtureSelect.appendChild(option);
+            fixtureSelect.disabled = shouldDisable;
+        }
+
+        function populateFixtureOptions(files) {
+            if (!fixtureSelect) {
+                return;
+            }
+            fixtureSelect.innerHTML = "";
+            const customOption = document.createElement("option");
+            customOption.value = "";
+            customOption.textContent = "Custom input";
+            fixtureSelect.appendChild(customOption);
+            files.forEach((file) => {
+                const option = document.createElement("option");
+                option.value = file;
+                option.textContent = file;
+                fixtureSelect.appendChild(option);
+            });
+            fixtureSelect.disabled = files.length === 0;
+        }
+
+        async function loadFixtureList() {
+            if (!fixtureSelect) {
+                return;
+            }
+            setFixtureSelectPlaceholder("Loading fixtures...");
+            updateFixtureMessage("");
+            try {
+                const response = await fetch("./fixtures/index.txt", { cache: "no-store" });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const manifestText = await response.text();
+                const files = manifestText
+                    .split(/\r?\n/)
+                    .map((line) => line.trim())
+                    .filter((line) => line.length > 0)
+                    .sort((a, b) => a.localeCompare(b));
+                populateFixtureOptions(files);
+                if (files.length === 0) {
+                    updateFixtureMessage("No fixtures found");
+                } else {
+                    const label = `Loaded ${files.length} fixture${files.length === 1 ? "" : "s"}`;
+                    updateFixtureMessage(label);
+                }
+            } catch (error) {
+                console.error("Failed to load fixtures list", error);
+                setFixtureSelectPlaceholder("Fixtures unavailable", true);
+                updateFixtureMessage("Fixture list unavailable");
+            }
+        }
+
+        async function loadFixtureFile(fileName) {
+            if (!inputEditor) {
+                return;
+            }
+            try {
+                const encodedName = fileName
+                    .split("/")
+                    .map((segment) => encodeURIComponent(segment))
+                    .join("/");
+                const response = await fetch(`./fixtures/${encodedName}`, { cache: "no-store" });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const content = await response.text();
+                isProgrammaticEditorChange = true;
+                inputEditor.setValue(content);
+                isProgrammaticEditorChange = false;
+                updateFixtureMessage(`Loaded fixture: ${fileName}`);
+                inputEditor.focus();
+            } catch (error) {
+                console.error(`Failed to load fixture "${fileName}"`, error);
+                updateFixtureMessage(`Failed to load fixture: ${fileName}`);
+            }
+        }
+
+        if (fixtureSelect) {
+            fixtureSelect.addEventListener("change", (event) => {
+                const selectedFile = event.target.value;
+                if (!selectedFile) {
+                    updateFixtureMessage("Custom input");
+                    return;
+                }
+                loadFixtureFile(selectedFile);
+            });
+        }
+
+        function renderResult(text) {
+            clearEditorErrorHighlight();
+            try {
+                const result = analyze_idl_wasm(text, "idl");
+                const errorMessage = typeof result.error === "string" ? result.error : null;
+                const hasError = Boolean(errorMessage);
+                parserOutputEl.textContent = result.ast ?? "";
+                parserOutputEl.classList.toggle("error", hasError);
+                if (inputEditor) {
+                    inputEditor.getWrapperElement().classList.toggle("error", hasError);
+                }
+                if (hasError) {
+                    highlightParseError(errorMessage);
+                    fillOutputStatesForFailure(errorMessage);
+                } else {
+                    const generated = typeof result.generated === "string" ? result.generated : "";
+                    updateOutputState("idl", {
+                        files: [{ path: "idl/normalized.idl", contents: generated }],
+                        activePath: "idl/normalized.idl",
+                        hasError: false,
+                        info: "Round-tripped IDL",
+                        message: "",
+                    });
+                    applyCodegenResults(result.codegen);
+                }
+                applyOutputToEditor();
+            } catch (err) {
+                const runtimeMessage = `Runtime error: ${err}`;
+                parserOutputEl.textContent = runtimeMessage;
+                parserOutputEl.classList.add("error");
+                if (inputEditor) {
+                    inputEditor.getWrapperElement().classList.add("error");
+                }
+                fillOutputStatesForFailure(runtimeMessage);
+                applyOutputToEditor();
+            }
+        }
+
+        async function writeToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+            const helper = document.createElement("textarea");
+            helper.value = text;
+            helper.setAttribute("readonly", "");
+            helper.style.position = "absolute";
+            helper.style.left = "-9999px";
+            document.body.appendChild(helper);
+            helper.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(helper);
+            return copied;
+        }
+
+        if (copyButton) {
+            copyButton.addEventListener("click", async () => {
+                const contents = generatedEditor
+                    ? generatedEditor.getValue()
+                    : generatedTextarea?.value ?? "";
+                if (!contents) {
+                    setCopyStatus("Nothing to copy", true);
+                    return;
+                }
+                try {
+                    const success = await writeToClipboard(contents);
+                    if (success) {
+                        setCopyStatus("Copied!");
+                    } else {
+                        setCopyStatus("Copy unavailable", true);
+                    }
+                } catch (error) {
+                    console.error("Failed to copy output", error);
+                    setCopyStatus("Copy failed", true);
+                }
+            });
+        }
+
+        async function downloadZipForCurrentTab() {
+            const state = outputState[currentOutputTab];
+            if (!state || !Array.isArray(state.files) || state.files.length === 0) {
+                setDownloadStatus("No files to download", true);
+                return;
+            }
+            if (!window.JSZip) {
+                setDownloadStatus("ZIP support unavailable", true);
+                return;
+            }
+            try {
+                const zip = new JSZip();
+                state.files.forEach((file, index) => {
+                    const name =
+                        (file && typeof file.path === "string" && file.path.length > 0)
+                            ? file.path
+                            : `file_${index + 1}.txt`;
+                    zip.file(name, file.contents ?? "");
+                });
+                const blob = await zip.generateAsync({ type: "blob" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `blueberry_${currentOutputTab}.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                setDownloadStatus("Download started");
+            } catch (error) {
+                console.error("Failed to build ZIP", error);
+                setDownloadStatus("ZIP creation failed", true);
+            }
+        }
+
+        if (downloadButton) {
+            downloadButton.addEventListener("click", () => {
+                downloadZipForCurrentTab();
+            });
+        }
+
+        async function bootstrap() {
+            await init();
+
+            inputEditor = CodeMirror.fromTextArea(textarea, {
+                mode: "text/x-csrc",
+                theme: "darcula",
+                lineNumbers: true,
+                matchBrackets: true,
+                autofocus: true,
+                indentUnit: 4,
+                tabSize: 4,
+            });
+
+            generatedEditor = CodeMirror.fromTextArea(generatedTextarea, {
+                mode: "text/x-csrc",
+                theme: "darcula",
+                lineNumbers: true,
+                readOnly: true,
+                lineWrapping: true,
+            });
+
+            requestAnimationFrame(() => {
+                inputEditor.refresh();
+                generatedEditor.refresh();
+            });
+
+            const sample = `module Example {\n    typedef long MyLong;\n\n    enum Status {\n        ACTIVE,\n        INACTIVE,\n        PENDING\n    };\n};`;
+
+            isProgrammaticEditorChange = true;
+            inputEditor.setValue(sample);
+            isProgrammaticEditorChange = false;
+            renderResult(sample);
+
+            inputEditor.on("change", (instance) => {
+                const value = instance.getValue();
+                if (!isProgrammaticEditorChange) {
+                    if (fixtureSelect) {
+                        fixtureSelect.value = "";
+                    }
+                    updateFixtureMessage("Custom input");
+                }
+                renderResult(value);
+            });
+
+            loadFixtureList().catch((error) => {
+                console.error("Failed to retrieve fixture list", error);
+            });
+        }
+
+        bootstrap().catch((err) => {
+            const message = `Failed to initialize parser: ${err}`;
+            parserOutputEl.textContent = message;
+            parserOutputEl.classList.add("error");
+            fillOutputStatesForFailure(message);
+            applyOutputToEditor();
+        });
+    </script>
+</body>
+</html>
